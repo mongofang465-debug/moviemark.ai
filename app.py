@@ -2,9 +2,9 @@ import streamlit as st
 import tempfile
 import subprocess
 import os
-from PIL import Image, ImageDraw, ImageFont
+import shutil
 
-st.title("🔥 视频防盗神器：动态滚动水印")
+st.title("🔥 视频防盗神器：动态滚动水印（大视频稳定版）")
 
 # 上传视频
 video_file = st.file_uploader("上传视频", type=["mp4", "mov"])
@@ -20,34 +20,40 @@ FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 if video_file and watermark_text:
     if st.button("生成视频"):
 
-        # 临时保存上传文件
+        # ===============================
+        # 1️⃣ 临时保存上传文件（流式写入，防大文件报错）
+        # ===============================
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_input:
-            tmp_input.write(video_file.read())
             input_path = tmp_input.name
+            # 流式写入文件
+            video_file.seek(0)
+            with open(input_path, "wb") as f:
+                shutil.copyfileobj(video_file, f)
 
         output_path = "output_watermark.mp4"
 
         # ===============================
-        # 根据选择模式生成不同 ffmpeg drawtext 公式
+        # 2️⃣ 根据选择模式生成不同 ffmpeg drawtext 公式
         # ===============================
         if mode == "蛇形游走":
-            # x轴匀速移动，y轴正弦波
-            vf_expr = f"drawtext=text='{watermark_text}':fontcolor=red:fontsize=48:x='mod(50*t\\, w-text_w)':y='h/2+50*sin(t*2)':shadowcolor=black:shadowx=2:shadowy=2"
+            vf_expr = f"drawtext=text='{watermark_text}':fontfile={FONT_PATH}:fontcolor=red:fontsize=48:x='mod(50*t\\, w-text_w)':y='h/2+50*sin(t*2)':shadowcolor=black:shadowx=2:shadowy=2"
         elif mode == "随机漂浮":
-            # 每秒随机位置
-            vf_expr = f"drawtext=text='{watermark_text}':fontcolor=red:fontsize=48:x='random(1)* (w-text_w)':y='random(1)*(h-text_h)':shadowcolor=black:shadowx=2:shadowy=2"
+            vf_expr = f"drawtext=text='{watermark_text}':fontfile={FONT_PATH}:fontcolor=red:fontsize=48:x='random(1)*(w-text_w)':y='random(1)*(h-text_h)':shadowcolor=black:shadowx=2:shadowy=2"
         elif mode == "边界巡航":
-            # 沿视频边框移动
-            vf_expr = f"drawtext=text='{watermark_text}':fontcolor=red:fontsize=48:x='if(lt(mod(t*100\\,2*w+h)\\,w),mod(t*100\\,w),if(lt(mod(t*100\\,2*w+h)\\,w+h),w,2*w+h-mod(t*100\\,2*w+h)))':y='if(lt(mod(t*100\\,2*w+h)\\,w),0,if(lt(mod(t*100\\,2*w+h)\\,w+h),mod(t*100\\,h),h))':shadowcolor=black:shadowx=2:shadowy=2"
+            vf_expr = f"drawtext=text='{watermark_text}':fontfile={FONT_PATH}:fontcolor=red:fontsize=48:x='if(lt(mod(t*100\\,2*w+h)\\,w),mod(t*100\\,w),if(lt(mod(t*100\\,2*w+h)\\,w+h),w,2*w+h-mod(t*100\\,2*w+h)))':y='if(lt(mod(t*100\\,2*w+h)\\,w),0,if(lt(mod(t*100\\,2*w+h)\\,w+h),mod(t*100\\,h),h))':shadowcolor=black:shadowx=2:shadowy=2"
         else:
-            vf_expr = f"drawtext=text='{watermark_text}':fontcolor=red:fontsize=48:x=50:y=50:shadowcolor=black:shadowx=2:shadowy=2"
+            vf_expr = f"drawtext=text='{watermark_text}':fontfile={FONT_PATH}:fontcolor=red:fontsize=48:x=50:y=50:shadowcolor=black:shadowx=2:shadowy=2"
 
-        # 执行 ffmpeg 命令
+        # ===============================
+        # 3️⃣ 执行 ffmpeg 命令
+        # ===============================
         cmd = [
             "ffmpeg",
+            "-y",                  # 覆盖输出文件
             "-i", input_path,
             "-vf", vf_expr,
-            "-codec:a", "copy",
+            "-codec:a", "copy",    # 音频不转码
+            "-threads", "2",       # 限制线程，防云端卡死
             output_path
         ]
 
