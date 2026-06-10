@@ -4,7 +4,8 @@ import subprocess
 import os
 import shutil
 
-st.title("🔥 视频防盗神器：动态滚动水印（大视频稳定版）")
+st.title("🔥 视频防盗神器：动态滚动水印")
+st.set_option('server.maxUploadSize', 500)
 
 # 上传视频
 video_file = st.file_uploader("上传视频", type=["mp4", "mov"])
